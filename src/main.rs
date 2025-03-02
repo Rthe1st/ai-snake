@@ -14,6 +14,7 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
 };
+use rand::SeedableRng;
 
 struct Game {
     snake: Vec<(u16, u16)>,
@@ -21,6 +22,7 @@ struct Game {
     direction: Direction,
     game_over: bool,
     frame_size: (u16, u16),  // (width, height)
+    rng: rand::rngs::StdRng,
 }
 
 #[derive(PartialEq)]
@@ -32,8 +34,8 @@ enum Direction {
 }
 
 impl Game {
-    fn new(width: u16, height: u16) -> Self {
-        let mut rng = rand::thread_rng();
+    fn new(width: u16, height: u16, seed: u64) -> Self {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         
         // Calculate playable area (accounting for borders)
         let max_x = width.saturating_sub(2);
@@ -49,6 +51,7 @@ impl Game {
             direction: Direction::Right,
             game_over: false,
             frame_size: (width, height),
+            rng,
         };
 
         // Initialize food items
@@ -60,27 +63,37 @@ impl Game {
     }
 
     fn generate_food(&mut self) {
-        let mut rng = rand::thread_rng();
         let (width, height) = self.frame_size;
         
         // Account for borders and ensure food is within playable area
         let max_x = width.saturating_sub(2);
         let max_y = height.saturating_sub(2);
         
-        // Calculate total empty space in frame
-        let total_space = (max_x - 1) * (max_y - 1);
-        let empty_space = total_space - self.snake.len() as u16;
+        // Try to find a valid position that's not on the snake
+        let mut attempts = 0;
+        while attempts < 100 { // Limit attempts to prevent infinite loop
+            let x = self.rng.gen_range(1..max_x);
+            let y = self.rng.gen_range(1..max_y);
+            let pos = (x, y);
+            
+            // Check if position is valid (not on snake or existing food)
+            if !self.snake.contains(&pos) && !self.food.contains(&pos) {
+                self.food.insert(pos);
+                return;
+            }
+            attempts += 1;
+        }
         
-        // Generate random position in empty space
-        let food_location = rng.gen_range(1..=empty_space);
-        
-        // Map food_location to x,y coordinates using modular arithmetic
-        // TODO: its possible to place food on top of the snake or other food
-        // Need to exclude snake/food locations from final mapping
-        let x = (food_location % max_x).max(1);
-        let y = (food_location / max_x).max(1);
-        
-        self.food.insert((x, y));
+        // If we couldn't find a position after max attempts, try systematic approach
+        for x in 1..max_x {
+            for y in 1..max_y {
+                let pos = (x, y);
+                if !self.snake.contains(&pos) && !self.food.contains(&pos) {
+                    self.food.insert(pos);
+                    return;
+                }
+            }
+        }
     }
 
     fn update(&mut self) {
@@ -138,7 +151,7 @@ fn main() -> Result<()> {
     let size = terminal.size()?;
     
     // Game state initialization with frame size
-    let mut game = Game::new(size.width, size.height);
+    let mut game = Game::new(size.width, size.height, rand::thread_rng().gen());
     let mut last_update = Instant::now();
     let tick_rate = Duration::from_millis(100);
 
@@ -227,4 +240,59 @@ fn main() -> Result<()> {
     disable_raw_mode()?;
     io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_food_within_bounds() {
+        let mut game = Game::new(20, 20, 42); // Create a 20x20 game area
+        game.food.clear(); // Clear initial food
+        
+        // Generate and test 50 food positions to ensure they're all within bounds
+        for _ in 0..50 {
+            game.generate_food();
+            let food = game.food.iter().next().unwrap();
+            
+            // Food should be within playable area (accounting for borders)
+            assert!(food.0 >= 1 && food.0 <= 18, "Food x position {} should be within bounds 1..18", food.0);
+            assert!(food.1 >= 1 && food.1 <= 18, "Food y position {} should be within bounds 1..18", food.1);
+            
+            game.food.clear(); // Clear for next iteration
+        }
+    }
+
+    #[test]
+    fn test_generate_food_not_on_snake() {
+        let mut game = Game::new(7, 7, 42);
+        game.food.clear();
+        
+        // Create a snake with multiple segments
+        game.snake = vec![
+            (5, 5),
+            (5, 6),
+            (5, 7),
+            (6, 7),
+            (7, 7),
+        ];
+        
+        // Calculate total possible positions (accounting for borders)
+        let width = game.frame_size.0.saturating_sub(4); // Subtract 2 for borders
+        let height = game.frame_size.1.saturating_sub(4);
+        let total_positions = (width * height) as usize;
+        let available_positions = total_positions - game.snake.len();
+        
+        // Generate food until we fill all available positions (plus 1 to make sure there's no error even when board is full)
+        while game.food.len() < available_positions {
+            game.generate_food();
+            dbg!(&game.food);
+        }
+
+        // Food should not be on any snake segment
+        for food in &game.food {
+            assert!(!game.snake.contains(food), "Food {:?} should not be on snake {:?}", food, game.snake);
+        }
+    }
 }
