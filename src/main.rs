@@ -18,6 +18,7 @@ struct Game {
     food: (u16, u16),
     direction: Direction,
     game_over: bool,
+    frame_size: (u16, u16),  // (width, height)
 }
 
 #[derive(PartialEq)]
@@ -35,6 +36,7 @@ impl Game {
             food: (5, 5),
             direction: Direction::Right,
             game_over: false,
+            frame_size: (0, 0),  // Will be updated when game starts
         }
     }
 
@@ -44,15 +46,31 @@ impl Game {
         }
 
         let (head_x, head_y) = self.snake[0];
+        let (width, height) = self.frame_size;
+        
+        // Account for borders by subtracting 1 from boundaries
+        let max_x = width.saturating_sub(2);
+        let max_y = height.saturating_sub(2);
+
         let new_head = match self.direction {
             Direction::Up => (head_x, head_y.saturating_sub(1)),
-            Direction::Down => (head_x, head_y + 1),
+            Direction::Down => (head_x, if head_y >= max_y { max_y } else { head_y + 1 }),
             Direction::Left => (head_x.saturating_sub(1), head_y),
-            Direction::Right => (head_x + 1, head_y),
+            Direction::Right => (if head_x >= max_x { max_x } else { head_x + 1 }, head_y),
         };
+
+        // Check if snake hit the boundaries
+        if new_head.0 == 0 || new_head.0 >= max_x || new_head.1 == 0 || new_head.1 >= max_y {
+            self.game_over = true;
+            return;
+        }
 
         self.snake.insert(0, new_head);
         self.snake.pop();
+    }
+
+    fn update_frame_size(&mut self, width: u16, height: u16) {
+        self.frame_size = (width, height);
     }
 }
 
@@ -70,6 +88,7 @@ fn main() -> Result<()> {
     loop {
         terminal.draw(|frame| {
             let size = frame.size();
+            game.update_frame_size(size.width, size.height);
             
             // Draw game area
             let block = Block::default()
@@ -92,6 +111,21 @@ fn main() -> Result<()> {
                 food_cell,
                 Rect::new(game.food.0, game.food.1, 1, 1),
             );
+
+            // Draw game over message if needed
+            if game.game_over {
+                let game_over = Paragraph::new("Game Over! Press 'q' to quit")
+                    .alignment(Alignment::Center);
+                frame.render_widget(
+                    game_over,
+                    Rect::new(
+                        size.width / 4,
+                        size.height / 2,
+                        size.width / 2,
+                        3,
+                    ),
+                );
+            }
         })?;
 
         // Input handling
