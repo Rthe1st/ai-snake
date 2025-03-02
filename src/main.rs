@@ -33,8 +33,18 @@ enum Direction {
 
 impl Game {
     fn new(width: u16, height: u16) -> Self {
+        let mut rng = rand::thread_rng();
+        
+        // Calculate playable area (accounting for borders)
+        let max_x = width.saturating_sub(2);
+        let max_y = height.saturating_sub(2);
+        
+        // Generate random starting position (ensuring we're not too close to borders)
+        let start_x = rng.gen_range(2..max_x-2);
+        let start_y = rng.gen_range(2..max_y-2);
+        
         let mut game = Self {
-            snake: vec![(2, 2)],
+            snake: vec![(start_x, start_y)],
             food: HashSet::new(),
             direction: Direction::Right,
             game_over: false,
