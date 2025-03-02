@@ -32,16 +32,21 @@ enum Direction {
 }
 
 impl Game {
-    fn new() -> Self {
-        let mut food = HashSet::new();
-
-        Self {
+    fn new(width: u16, height: u16) -> Self {
+        let mut game = Self {
             snake: vec![(2, 2)],
-            food,
+            food: HashSet::new(),
             direction: Direction::Right,
             game_over: false,
-            frame_size: (0, 0),  // Will be updated when game starts
+            frame_size: (width, height),
+        };
+
+        // Initialize food items
+        while game.food.len() < 10 {
+            game.generate_food();
         }
+
+        game
     }
 
     fn generate_food(&mut self) {
@@ -111,10 +116,6 @@ impl Game {
         }
         
     }
-
-    fn update_frame_size(&mut self, width: u16, height: u16) {
-        self.frame_size = (width, height);
-    }
 }
 
 fn main() -> Result<()> {
@@ -123,15 +124,17 @@ fn main() -> Result<()> {
     io::stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Game state
-    let mut game = Game::new();
+    // Get initial terminal size
+    let size = terminal.size()?;
+    
+    // Game state initialization with frame size
+    let mut game = Game::new(size.width, size.height);
     let mut last_update = Instant::now();
     let tick_rate = Duration::from_millis(100);
 
     loop {
         terminal.draw(|frame| {
             let size = frame.size();
-            game.update_frame_size(size.width, size.height);
             
             // Draw game area
             let block = Block::default()
