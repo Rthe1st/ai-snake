@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     io,
     time::{Duration, Instant},
 };
@@ -16,7 +17,7 @@ use ratatui::{
 
 struct Game {
     snake: Vec<(u16, u16)>,
-    food: (u16, u16),
+    food: HashSet<(u16, u16)>,
     direction: Direction,
     game_over: bool,
     frame_size: (u16, u16),  // (width, height)
@@ -32,9 +33,11 @@ enum Direction {
 
 impl Game {
     fn new() -> Self {
+        let mut food = HashSet::new();
+
         Self {
             snake: vec![(2, 2)],
-            food: (5, 5),
+            food,
             direction: Direction::Right,
             game_over: false,
             frame_size: (0, 0),  // Will be updated when game starts
@@ -57,10 +60,12 @@ impl Game {
         let food_location = rng.gen_range(1..=empty_space);
         
         // Map food_location to x,y coordinates using modular arithmetic
+        // TODO: its possible to place food on top of the snake or other food
+        // Need to exclude snake/food locations from final mapping
         let x = (food_location % max_x).max(1);
         let y = (food_location / max_x).max(1);
         
-        self.food = (x, y);
+        self.food.insert((x, y));
     }
 
     fn update(&mut self) {
@@ -90,14 +95,21 @@ impl Game {
 
         self.snake.insert(0, new_head);
         
-        // Check if snake ate the food
-        if new_head == self.food {
+        // Check if snake ate any food
+        if self.food.remove(&new_head) {
             // Don't remove the tail to make the snake grow
-            self.generate_food();
+            self.generate_food(); // Generate new food when one is eaten
         } else {
             // Remove tail only if food wasn't eaten
             self.snake.pop();
         }
+        
+        // TODO: as we only remove food when eaten, we only need to to this at init time
+        // But that requires changing the game init to be aware of frame size.
+        if self.food.len() < 3 {
+            self.generate_food();
+        }
+        
     }
 
     fn update_frame_size(&mut self, width: u16, height: u16) {
@@ -136,12 +148,14 @@ fn main() -> Result<()> {
                 );
             }
 
-            // Draw food
-            let food_cell = Paragraph::new("●");
-            frame.render_widget(
-                food_cell,
-                Rect::new(game.food.0, game.food.1, 1, 1),
-            );
+            // Draw all food items
+            for &(x, y) in &game.food {
+                let food_cell = Paragraph::new("●");
+                frame.render_widget(
+                    food_cell,
+                    Rect::new(x, y, 1, 1),
+                );
+            }
 
             // Draw game over message if needed
             if game.game_over {
