@@ -88,7 +88,7 @@ impl Game {
         };
 
         // Check if snake hit the boundaries
-        if new_head.0 == 0 || new_head.0 >= max_x || new_head.1 == 0 || new_head.1 >= max_y {
+        if new_head.0 == 0 || new_head.0 >= max_x || new_head.1 == 0 || new_head.1 >= max_y || self.snake.contains(&new_head) {
             self.game_over = true;
             return;
         }
