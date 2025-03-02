@@ -49,18 +49,18 @@ impl Game {
         let max_x = width.saturating_sub(2);
         let max_y = height.saturating_sub(2);
         
-        // Generate food position that's not on the snake
-        loop {
-            let new_food = (
-                rng.gen_range(1..max_x),
-                rng.gen_range(1..max_y),
-            );
-            
-            if !self.snake.contains(&new_food) {
-                self.food = new_food;
-                break;
-            }
-        }
+        // Calculate total empty space in frame
+        let total_space = (max_x - 1) * (max_y - 1);
+        let empty_space = total_space - self.snake.len() as u16;
+        
+        // Generate random position in empty space
+        let food_location = rng.gen_range(1..=empty_space);
+        
+        // Map food_location to x,y coordinates using modular arithmetic
+        let x = (food_location % max_x).max(1);
+        let y = (food_location / max_x).max(1);
+        
+        self.food = (x, y);
     }
 
     fn update(&mut self) {
