@@ -1,0 +1,12 @@
+[package]
+name = "ai-snake"
+version = "0.1.0"
+edition = "2021"
+authors = ["AI Snake Developer"]
+description = "A terminal-based snake game using Ratatui"
+
+[dependencies]
+ratatui = "0.24.0"
+crossterm = "0.27.0"
+rand = "0.8.5"
+anyhow = "1.0.75"
