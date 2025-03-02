@@ -106,7 +106,7 @@ impl Game {
         
         // TODO: as we only remove food when eaten, we only need to to this at init time
         // But that requires changing the game init to be aware of frame size.
-        if self.food.len() < 3 {
+        while self.food.len() < 10 {
             self.generate_food();
         }
         
