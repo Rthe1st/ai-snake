@@ -8,6 +8,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use rand::Rng;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
@@ -40,6 +41,28 @@ impl Game {
         }
     }
 
+    fn generate_food(&mut self) {
+        let mut rng = rand::thread_rng();
+        let (width, height) = self.frame_size;
+        
+        // Account for borders and ensure food is within playable area
+        let max_x = width.saturating_sub(2);
+        let max_y = height.saturating_sub(2);
+        
+        // Generate food position that's not on the snake
+        loop {
+            let new_food = (
+                rng.gen_range(1..max_x),
+                rng.gen_range(1..max_y),
+            );
+            
+            if !self.snake.contains(&new_food) {
+                self.food = new_food;
+                break;
+            }
+        }
+    }
+
     fn update(&mut self) {
         if self.game_over {
             return;
@@ -66,7 +89,15 @@ impl Game {
         }
 
         self.snake.insert(0, new_head);
-        self.snake.pop();
+        
+        // Check if snake ate the food
+        if new_head == self.food {
+            // Don't remove the tail to make the snake grow
+            self.generate_food();
+        } else {
+            // Remove tail only if food wasn't eaten
+            self.snake.pop();
+        }
     }
 
     fn update_frame_size(&mut self, width: u16, height: u16) {
